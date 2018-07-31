@@ -1,1 +1,4 @@
 tags
+run.sh
+train.sh
+vgg.json
