@@ -1,6 +1,7 @@
 """
 Implementation of VGGNet, from paper
 """
+import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -20,16 +21,18 @@ MOMENTUM = 0.9
 LR_INIT = 0.01
 IMAGE_DIM = 224  # pixels
 NUM_CLASSES = 1000  # 1000 classes for imagenet 2012
-DEVICE_IDS = [0, 1]  # GPUs to use
+DEVICE_IDS = [0, 1, 2, 3]  # GPUs to use
 # modify this to point to your data directory
 INPUT_ROOT_DIR = 'vggnet_data_in'
 TRAIN_IMG_DIR = 'vggnet_data_in/imagenet'
-OUTPUT_DIR = 'vggnet_data_out/tblogs'  # tensorboard logs
+OUTPUT_DIR = 'vggnet_data_out'
+LOG_DIR = OUTPUT_DIR + '/tblogs'  # tensorboard logs
+CPT_DIR = OUTPUT_DIR + '/checkpoints'  # checkpoint directory
 
 
-class AlexNet(nn.Module):
+class VGGNet(nn.Module):
     """
-    Neural network model consisting of layers propsed by AlexNet paper.
+    Neural network model consisting of layers propsed by VGGNet paper.
     """
     def __init__(self, num_classes=1000):
         """
@@ -111,13 +114,15 @@ def init_weights(m):
 
 
 if __name__ == '__main__':
+    seed = torch.initial_seed()
+
     # create model
-    alexnet = AlexNet(num_classes=NUM_CLASSES).to(device)
+    vggnet = VGGNet(num_classes=NUM_CLASSES).to(device)
     # train on multiple GPUs
-    alexnet = torch.nn.parallel.DataParallel(alexnet, device_ids=DEVICE_IDS)
-    alexnet.apply(init_weights)
-    print(alexnet)
-    print('AlexNet created')
+    vggnet = torch.nn.parallel.DataParallel(vggnet, device_ids=DEVICE_IDS)
+    vggnet.apply(init_weights)
+    print(vggnet)
+    print('VGGNet created')
 
     # create dataset and data loader
     dataset = datasets.ImageFolder(TRAIN_IMG_DIR, transforms.Compose([
@@ -136,16 +141,16 @@ if __name__ == '__main__':
 
     # create optimizer
     optimizer = optim.SGD(
-        params=alexnet.parameters(),
+        params=vggnet.parameters(),
         lr=LR_INIT,
         momentum=MOMENTUM)
     print('Optimizer created')
 
-    # multiply LR by 1 / 10 after every 30 epochs
+    # multiply LR by 1 / 10 after every 20 epochs
     lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)
     print('LR Scheduler created')
 
-    tbwriter = SummaryWriter(log_dir=OUTPUT_DIR)
+    tbwriter = SummaryWriter(log_dir=LOG_DIR)
     print('TensorboardX summary writer created')
 
     # criterion defined
@@ -162,7 +167,7 @@ if __name__ == '__main__':
             optimizer.zero_grad()
 
             # calculate the loss
-            output = alexnet(imgs)
+            output = vggnet(imgs)
             loss = F.cross_entropy(output, classes)
             # loss = F.nll_loss(F.log_softmax(output, dim=1), target=classes)
 
@@ -180,4 +185,28 @@ if __name__ == '__main__':
                         .format(epoch + 1, total_steps, loss.item(), accuracy.item()))
                     tbwriter.add_scalar('loss', loss.item(), total_steps)
 
+            if total_steps % 100 == 0:
+                with torch.no_grad():
+                    for name, parameter in vggnet.named_parameters():
+                        if parameter.grad is not None:
+                            avg_grad = torch.mean(parameter.grad)
+                            tbwriter.add_histogram('grad/{}'.format(name), parameter.grad.cpu().numpy(), total_steps)
+                            tbwriter.add_scalar('avg_grad/{}'.format(name), avg_grad.item(), total_steps)
+                        if parameter.data is not None:
+                            avg_weight = torch.mean(parameter.data)
+                            tbwriter.add_histogram('weight/{}'.format(name), parameter.data.cpu().numpy(), total_steps)
+                            tbwriter.add_scalar('avg_weight/{}'.format(name), avg_weight.item())
+
             total_steps += 1
+
+        # save checkpoint after epoch
+        cpt_dir = os.path.join(CPT_DIR, 'checkpoint_e{}.pkl', epoch + 1)
+        state = {
+            'epocoh': epoch,
+            'model': vggnet.state_dict(),
+            'optimizer': optimizer.state_dict(),
+            'seed': seed,
+            'total_steps': total_steps,
+        }
+        torch.save(state, cpt_dir)
+    tbwriter.close()
