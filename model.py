@@ -193,8 +193,8 @@ if __name__ == '__main__':
                             tbwriter.add_scalar('avg_grad/{}'.format(name), avg_grad.item(), total_steps)
                             tbwriter.add_histogram('grad/{}'.format(name), parameter.grad.cpu().numpy(), total_steps)
                         if parameter.data is not None:
-                            print('\tavg_weight for {} = {:.4f}'.format(name, avg_weight))
                             avg_weight = torch.mean(parameter.data)
+                            print('\tavg_weight for {} = {:.4f}'.format(name, avg_weight))
                             tbwriter.add_scalar('avg_weight/{}'.format(name), avg_weight.item())
                             tbwriter.add_histogram('weight/{}'.format(name), parameter.data.cpu().numpy(), total_steps)
 
