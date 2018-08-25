@@ -18,7 +18,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 NUM_EPOCHS = 74
 BATCH_SIZE = 256
 MOMENTUM = 0.9
-LR_INIT = 0.01
+LR_INIT = 0.0001
 IMAGE_DIM = 224  # pixels
 NUM_CLASSES = 1000  # 1000 classes for imagenet 2012
 DEVICE_IDS = [0, 1, 2, 3]  # GPUs to use
@@ -169,7 +169,6 @@ if __name__ == '__main__':
             # calculate the loss
             output = vggnet(imgs)
             loss = F.cross_entropy(output, classes)
-            # loss = F.nll_loss(F.log_softmax(output, dim=1), target=classes)
 
             # update the parameters
             loss.backward()
@@ -190,12 +189,14 @@ if __name__ == '__main__':
                     for name, parameter in vggnet.named_parameters():
                         if parameter.grad is not None:
                             avg_grad = torch.mean(parameter.grad)
-                            tbwriter.add_histogram('grad/{}'.format(name), parameter.grad.cpu().numpy(), total_steps)
+                            print('\tavg_grad for {} = {:.4f}'.format(name, avg_grad))
                             tbwriter.add_scalar('avg_grad/{}'.format(name), avg_grad.item(), total_steps)
+                            tbwriter.add_histogram('grad/{}'.format(name), parameter.grad.cpu().numpy(), total_steps)
                         if parameter.data is not None:
+                            print('\tavg_weight for {} = {:.4f}'.format(name, avg_weight))
                             avg_weight = torch.mean(parameter.data)
-                            tbwriter.add_histogram('weight/{}'.format(name), parameter.data.cpu().numpy(), total_steps)
                             tbwriter.add_scalar('avg_weight/{}'.format(name), avg_weight.item())
+                            tbwriter.add_histogram('weight/{}'.format(name), parameter.data.cpu().numpy(), total_steps)
 
             total_steps += 1
 
