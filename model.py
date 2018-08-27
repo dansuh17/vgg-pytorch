@@ -18,7 +18,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 NUM_EPOCHS = 74
 BATCH_SIZE = 256
 MOMENTUM = 0.9
-LR_INIT = 0.0001
+LR_INIT = 0.00001
 IMAGE_DIM = 224  # pixels
 NUM_CLASSES = 1000  # 1000 classes for imagenet 2012
 DEVICE_IDS = [0, 1, 2, 3]  # GPUs to use
@@ -110,7 +110,7 @@ class VGGNet(nn.Module):
 def init_weights(m):
     if isinstance(m, nn.Conv2d):
         nn.init.normal_(m.weight, mean=0, std=0.1)
-        nn.init.constant_(m.bias, 0)
+        nn.init.constant_(m.bias, 0.5)
 
 
 if __name__ == '__main__':
@@ -129,12 +129,14 @@ if __name__ == '__main__':
         transforms.RandomResizedCrop(IMAGE_DIM, scale=(0.9, 1.0), ratio=(0.9, 1.1)),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ]))
     print('Dataset created')
     dataloader = data.DataLoader(
         dataset,
         shuffle=True,
         pin_memory=True,
+        num_workers=8,
         drop_last=True,
         batch_size=BATCH_SIZE)
     print('Dataloader created')
@@ -154,7 +156,7 @@ if __name__ == '__main__':
     print('TensorboardX summary writer created')
 
     # criterion defined
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(size_average=True)
     print('Criterion defined')
 
     # start training!!
@@ -164,13 +166,17 @@ if __name__ == '__main__':
         lr_scheduler.step()
         for imgs, classes in dataloader:
             imgs, classes = imgs.to(device), classes.to(device)
-            optimizer.zero_grad()
 
             # calculate the loss
             output = vggnet(imgs)
-            loss = F.cross_entropy(output, classes)
+            print('output')
+            print(output)
+            print('Classes')
+            print(classes)
+            loss = criterion(output, classes)
 
             # update the parameters
+            optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
@@ -183,6 +189,7 @@ if __name__ == '__main__':
                     print('Epoch: {} \tStep: {} \tLoss: {:.4f} \tAcc: {}'
                         .format(epoch + 1, total_steps, loss.item(), accuracy.item()))
                     tbwriter.add_scalar('loss', loss.item(), total_steps)
+                    tbwriter.add_scalar('accuracy', accuracy.item(), total_steps)
 
             if total_steps % 100 == 0:
                 with torch.no_grad():
@@ -203,7 +210,7 @@ if __name__ == '__main__':
         # save checkpoint after epoch
         cpt_dir = os.path.join(CPT_DIR, 'checkpoint_e{}.pkl', epoch + 1)
         state = {
-            'epocoh': epoch,
+            'epoch': epoch,
             'model': vggnet.state_dict(),
             'optimizer': optimizer.state_dict(),
             'seed': seed,
