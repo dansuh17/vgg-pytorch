@@ -3,3 +3,5 @@ run.sh
 train.sh
 vgg.json
 user_dev_workspace/
+.idea/
+venv/
