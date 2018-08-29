@@ -1,6 +1,7 @@
 """
 Implementation of VGGNet, from paper
 """
+import torch
 import torch.nn as nn
 
 
@@ -134,3 +135,10 @@ class VGGNet(nn.Module):
         if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
             nn.init.normal_(m.weight, mean=0, std=0.1)
             nn.init.constant_(m.bias, 0)
+
+if __name__ == '__main__':
+    net = VGGNet(VGG_CONFS['vgg16'], dim=32, num_classes=10)
+    sample_data = torch.randn((10, 3, 32, 32))
+    out = net(sample_data)
+    print(out)
+    print(out.size())
