@@ -29,6 +29,8 @@ CPT_DIR = OUTPUT_DIR + '/checkpoints'  # checkpoint directory
 
 normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
+os.makedirs(INPUT_ROOT_DIR, exist_ok=True)
+
 # create dataset
 dataset = None
 NUM_CLASSES = None
