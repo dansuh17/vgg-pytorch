@@ -18,7 +18,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 NUM_EPOCHS = 74
 BATCH_SIZE = 256
 MOMENTUM = 0.9
-LR_INIT = 0.00001
+LR_INIT = 0.0001
 IMAGE_DIM = 224  # pixels
 NUM_CLASSES = 1000  # 1000 classes for imagenet 2012
 DEVICE_IDS = [0, 1, 2, 3]  # GPUs to use
@@ -81,7 +81,6 @@ class VGGNet(nn.Module):
             nn.ReLU(inplace=True),
             nn.MaxPool2d(2, 2),  # (b x 512 x 7 x 7)
         )
-        # classifier is just a name for linear layers
         self.classifier = nn.Sequential(
             nn.Linear(in_features=(512 * 7 * 7), out_features=4096),
             nn.Dropout(p=0.5, inplace=True),
@@ -103,14 +102,19 @@ class VGGNet(nn.Module):
             output (Tensor): output tensor
         """
         x = self.net(x)
+        print('Net output')
+        print(x)
         x = x.view(-1, 512 * 7 * 7)  # reduce the dimensions for linear layer input
         return self.classifier(x)
 
 
 def init_weights(m):
-    if isinstance(m, nn.Conv2d):
-        nn.init.normal_(m.weight, mean=0, std=0.1)
-        nn.init.constant_(m.bias, 0.5)
+    if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
+        if m.weight is not None:
+            # nn.init.normal_(m.weight, mean=0, std=0.1)
+            nn.init.xavier_normal_(m.weight)
+        if m.bias is not None:
+            nn.init.constant_(m.bias, 0.0)
 
 
 if __name__ == '__main__':
@@ -132,6 +136,7 @@ if __name__ == '__main__':
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ]))
     print('Dataset created')
+
     dataloader = data.DataLoader(
         dataset,
         shuffle=True,
@@ -169,7 +174,7 @@ if __name__ == '__main__':
 
             # calculate the loss
             output = vggnet(imgs)
-            print('output')
+            print('Output')
             print(output)
             print('Classes')
             print(classes)
