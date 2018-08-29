@@ -12,7 +12,7 @@ from model import VGGNet, VGG_CONFS
 # define pytorch device - useful for device-agnostic execution
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-DATASET = 'imagenet'  # or 'cifar10' or 'cifar100'
+DATASET = 'cifar10'  # or 'cifar10' or 'cifar100'
 MODEL_TYPE = 'vgg16'
 # define model parameters based on original paper
 NUM_EPOCHS = 74
