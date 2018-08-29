@@ -63,7 +63,6 @@ class VGGNet(nn.Module):
             nn.ReLU(inplace=True),
             nn.MaxPool2d(2, 2),  # (b x 512 x 7 x 7)
         )
-        # classifier is just a name for linear layers
         self.classifier = nn.Sequential(
             nn.Linear(in_features=(512 * 7 * 7), out_features=4096),
             nn.Dropout(p=0.5, inplace=True),
