@@ -18,7 +18,7 @@ MODEL_TYPE = 'vgg16'
 NUM_EPOCHS = 74
 BATCH_SIZE = 256
 MOMENTUM = 0.9
-LR_INIT = 0.0001
+LR_INIT = 1e-2
 DEVICE_IDS = [0, 1, 2, 3]  # GPUs to use
 # modify this to point to your data directory
 INPUT_ROOT_DIR = 'vggnet_data_in'
@@ -27,14 +27,16 @@ OUTPUT_DIR = 'vggnet_data_out'
 LOG_DIR = OUTPUT_DIR + '/tblogs'  # tensorboard logs
 CPT_DIR = OUTPUT_DIR + '/checkpoints'  # checkpoint directory
 
-normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-
 os.makedirs(INPUT_ROOT_DIR, exist_ok=True)
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(CPT_DIR, exist_ok=True)
+os.makedirs(LOG_DIR, exist_ok=True)
 
 # create dataset
 dataset = None
 NUM_CLASSES = None
 IMAGE_DIM = None
+normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 if DATASET == 'imagenet':
     NUM_CLASSES = 1000  # 1000 classes for imagenet challenge 2012
     IMAGE_DIM = 224  # pixels
@@ -71,9 +73,8 @@ print('Dataset created - size: {}'.format(len(dataset)))
 seed = torch.initial_seed()
 print('Using seed : {}'.format(seed))
 
-# create model
+# create model & train on multiple GPUs
 vggnet = VGGNet(VGG_CONFS[MODEL_TYPE], dim=IMAGE_DIM, num_classes=NUM_CLASSES).to(device)
-# train on multiple GPUs
 vggnet = torch.nn.parallel.DataParallel(vggnet, device_ids=DEVICE_IDS)
 print(vggnet)
 print('VGGNet created')
@@ -91,6 +92,7 @@ print('Dataloader created')
 optimizer = optim.SGD(
     params=vggnet.parameters(),
     lr=LR_INIT,
+    weight_decay=0.00005,
     momentum=MOMENTUM)
 print('Optimizer created')
 
@@ -112,13 +114,13 @@ for epoch in range(NUM_EPOCHS):
     lr_scheduler.step()
     for imgs, classes in dataloader:
         imgs, classes = imgs.to(device), classes.to(device)
-        optimizer.zero_grad()
 
         # calculate the loss
         output = vggnet(imgs)
-        loss = F.cross_entropy(output, classes)
+        loss = criterion(output, classes)
 
         # update the parameters
+        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
@@ -137,21 +139,22 @@ for epoch in range(NUM_EPOCHS):
                 for name, parameter in vggnet.named_parameters():
                     if parameter.grad is not None:
                         avg_grad = torch.mean(parameter.grad)
-                        print('\tavg_grad for {} = {:.4f}'.format(name, avg_grad))
+                        print('\tavg_grad for {} = {:.6f}'.format(name, avg_grad))
                         tbwriter.add_scalar('avg_grad/{}'.format(name), avg_grad.item(), total_steps)
                         tbwriter.add_histogram('grad/{}'.format(name), parameter.grad.cpu().numpy(), total_steps)
                     if parameter.data is not None:
                         avg_weight = torch.mean(parameter.data)
-                        print('\tavg_weight for {} = {:.4f}'.format(name, avg_weight))
+                        print('\tavg_weight for {} = {:.6f}'.format(name, avg_weight))
                         tbwriter.add_scalar('avg_weight/{}'.format(name), avg_weight.item())
                         tbwriter.add_histogram('weight/{}'.format(name), parameter.data.cpu().numpy(), total_steps)
+                    print()
 
         total_steps += 1
 
     # save checkpoint after epoch
     cpt_dir = os.path.join(CPT_DIR, 'checkpoint_e{}.pkl'.format(epoch + 1))
     torch.save({
-        'epocoh': epoch,
+        'epoch': epoch,
         'model': vggnet.state_dict(),
         'optimizer': optimizer.state_dict(),
         'seed': seed,

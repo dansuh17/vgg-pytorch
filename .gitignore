@@ -5,3 +5,6 @@ vgg.json
 user_dev_workspace/
 .idea/
 venv/
+__pycache__/
+log.log
+vgg_imagenet.json
