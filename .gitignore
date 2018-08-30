@@ -8,3 +8,4 @@ venv/
 __pycache__/
 log.log
 vgg_imagenet.json
+.ipynb_checkpoints/
